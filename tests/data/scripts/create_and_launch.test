@@ -1,0 +1,7 @@
+# Creates and then launches a legacy (1.5.2) and a OneSix (1.6.4) instance, with and without forge and liteloader
+
+NAME Create and launch
+
+MESSAGE Setting up window size and position
+RESIZE 1024 768
+MOVE 100 100 # offset so we don't get problems because of system stuff

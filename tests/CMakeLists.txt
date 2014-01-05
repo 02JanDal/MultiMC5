@@ -90,3 +90,7 @@ add_custom_target(MultiMC_Test_Data
  COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/data
  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/data ${CMAKE_CURRENT_BINARY_DIR}/data
 )
+
+if(MultiMC_FULL_TEST)
+	add_subdirectory(full)
+endif(MultiMC_FULL_TEST)

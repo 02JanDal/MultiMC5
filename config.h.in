@@ -20,3 +20,5 @@
 // It defaults in CMakeLists.txt to "http://multimc.org/rss.xml"
 #define NEWS_RSS_URL       "@MultiMC_NEWS_RSS_URL@"
 
+// Is this a full test build?
+#cmakedefine MultiMC_FULL_TEST

@@ -508,6 +508,8 @@ IF(MultiMC_CODE_COVERAGE)
 	SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -O0 --coverage")
 ENDIF(MultiMC_CODE_COVERAGE)
 
+OPTION(MultiMC_FULL_TEST "Creates a full test executable" OFF)
+
 # Tell CMake that MultiMCLauncher.jar is generated.
 SET_SOURCE_FILES_PROPERTIES(${PROJECT_BINARY_DIR}/depends/launcher/MultiMCLauncher.jar GENERATED)
 SET_SOURCE_FILES_PROPERTIES(${PROJECT_BINARY_DIR}/depends/javacheck/JavaCheck.jar GENERATED)

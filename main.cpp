@@ -1,10 +1,23 @@
 #include "MultiMC.h"
 #include "gui/MainWindow.h"
+#include "config.h"
+
+#ifdef MultiMC_FULL_TEST
+#include <QPluginLoader>
+#include "tests/full/TesterInterface.h"
+#endif
 
 int main_gui(MultiMC &app)
 {
+#ifdef MultiMC_FULL_TEST
+	inject("FullTest");
+#endif
+
 	// show main window
 	MainWindow mainWin;
+#ifdef MultiMC_FULL_TEST
+	interface->setup(mainWin.windowHandle());
+#endif
 	mainWin.restoreState(QByteArray::fromBase64(MMC->settings()->get("MainWindowState").toByteArray()));
 	mainWin.restoreGeometry(QByteArray::fromBase64(MMC->settings()->get("MainWindowGeometry").toByteArray()));
 	mainWin.show();
