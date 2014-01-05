@@ -15,7 +15,7 @@ public:
 	}
 
 	virtual void init() = 0;
-	virtual void setup(QWindow *window) = 0;
+	virtual void setup(QWidget *window) = 0;
 };
 
 Q_DECLARE_INTERFACE(TesterInterface, TesterInterface_iid)

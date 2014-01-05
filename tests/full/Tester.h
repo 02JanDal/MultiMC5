@@ -17,12 +17,11 @@ public:
 	Tester();
 
 	void init();
-	void setup(QWindow *window);
-
+	void setup(QWidget *window);
 private:
 	Executer *m_executer;
 	QTextStream out;
-	QWindow *m_window;
+	QWidget *m_window;
 
 private
 slots:

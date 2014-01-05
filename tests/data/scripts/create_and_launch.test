@@ -5,3 +5,19 @@ NAME Create and launch
 MESSAGE Setting up window size and position
 RESIZE 1024 768
 MOVE 100 100 # offset so we don't get problems because of system stuff
+
+CATEGORY Launch vanilla 1.5.2 (Legacy)
+MOUSE CLICK L 120 150
+SLEEP 1s
+MOUSE CLICK L 610 470
+SLEEP 1s
+KEY SEQUENCE "Legacy Test"
+SLEEP 1s
+MOUSE CLICK L 713 515
+SLEEP 1s
+MOUSE CLICK L 600 570
+SLEEP 1s
+MOUSE CLICK L 750 620
+SLEEP 1s
+MOUSE CLICK L 680 600
+SLEEP 1s

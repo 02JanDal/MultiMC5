@@ -1,5 +1,8 @@
 #include "Tester.h"
 
+#include <QWidget>
+#include <QApplication>
+
 #include <qtestkeyboard.h>
 #include <qtestmouse.h>
 
@@ -40,7 +43,7 @@ void Tester::init()
 	connect(m_executer, &Executer::moveWindow, this, &Tester::moveWindow);
 }
 
-void Tester::setup(QWindow *window)
+void Tester::setup(QWidget *window)
 {
 	m_window = window;
 	m_executer->start();
@@ -101,35 +104,40 @@ void Tester::keyRelease(unsigned char key, Qt::KeyboardModifiers modifiers)
 
 void Tester::mouseClick(Qt::MouseButton button, Qt::KeyboardModifiers stateKey, QPoint pos)
 {
-	QTest::mouseClick(m_window, button, stateKey, pos);
+	QWidget *widget = qApp->topLevelAt(pos);
+	QTest::mouseClick(widget, button, stateKey, widget->mapFromGlobal(pos));
 }
 void Tester::mouseDClick(Qt::MouseButton button, Qt::KeyboardModifiers stateKey, QPoint pos)
 {
-	QTest::mouseDClick(m_window, button, stateKey, pos);
+	QWidget *widget = qApp->topLevelAt(pos);
+	QTest::mouseDClick(widget, button, stateKey, widget->mapFromGlobal(pos));
 }
 void Tester::mousePress(Qt::MouseButton button, Qt::KeyboardModifiers stateKey, QPoint pos)
 {
-	QTest::mousePress(m_window, button, stateKey, pos);
+	QWidget *widget = qApp->topLevelAt(pos);
+	QTest::mousePress(widget, button, stateKey, widget->mapFromGlobal(pos));
 }
 void Tester::mouseMove(Qt::MouseButton button, Qt::KeyboardModifiers stateKey, QPoint pos)
 {
-	QTest::mouseEvent(QTest::MouseMove, m_window, button, stateKey, pos);
+	QWidget *widget = qApp->topLevelAt(pos);
+	QTest::mouseMove(widget, widget->mapFromGlobal(pos));
 }
 void Tester::mouseRelease(Qt::MouseButton button, Qt::KeyboardModifiers stateKey, QPoint pos)
 {
-	QTest::mouseRelease(m_window, button, stateKey, pos);
+	QWidget *widget = qApp->topLevelAt(pos);
+	QTest::mouseRelease(widget, button, stateKey, widget->mapFromGlobal(pos));
 }
 
 void Tester::resizeWindow(const QString &name, const QSize &newSize)
 {
-	QWindow *window;
+	QWidget *window;
 	if (name.isEmpty())
 	{
 		window = m_window;
 	}
 	else
 	{
-		window = m_window->findChild<QWindow *>(name);
+		window = m_window->findChild<QWidget *>(name);
 	}
 	if (window)
 	{
@@ -138,17 +146,17 @@ void Tester::resizeWindow(const QString &name, const QSize &newSize)
 }
 void Tester::moveWindow(const QString &name, const QPoint &pos)
 {
-	QWindow *window;
+	QWidget *window;
 	if (name.isEmpty())
 	{
 		window = m_window;
 	}
 	else
 	{
-		window = m_window->findChild<QWindow *>(name);
+		window = m_window->findChild<QWidget *>(name);
 	}
 	if (window)
 	{
-		window->setPosition(pos);
+		window->move(pos);
 	}
 }

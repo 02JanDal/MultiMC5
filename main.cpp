@@ -16,7 +16,7 @@ int main_gui(MultiMC &app)
 	// show main window
 	MainWindow mainWin;
 #ifdef MultiMC_FULL_TEST
-	interface->setup(mainWin.windowHandle());
+	interface->setup(&mainWin);
 #endif
 	mainWin.restoreState(QByteArray::fromBase64(MMC->settings()->get("MainWindowState").toByteArray()));
 	mainWin.restoreGeometry(QByteArray::fromBase64(MMC->settings()->get("MainWindowGeometry").toByteArray()));
