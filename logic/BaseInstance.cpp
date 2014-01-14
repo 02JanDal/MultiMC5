@@ -28,6 +28,7 @@
 #include "pathutils.h"
 #include "lists/MinecraftVersionList.h"
 #include "logic/icons/IconList.h"
+#include "logic/sync/SyncFactory.h"
 
 BaseInstance::BaseInstance(BaseInstancePrivate *d_in, const QString &rootDir,
 						   SettingsObject *settings_obj, QObject *parent)
@@ -36,6 +37,7 @@ BaseInstance::BaseInstance(BaseInstancePrivate *d_in, const QString &rootDir,
 	I_D(BaseInstance);
 	d->m_settings = settings_obj;
 	d->m_rootDir = rootDir;
+	d->m_sync = 0;
 
 	settings().registerSetting("name", "Unnamed Instance");
 	settings().registerSetting("iconKey", "default");
@@ -81,6 +83,13 @@ BaseInstance::BaseInstance(BaseInstancePrivate *d_in, const QString &rootDir,
 	settings().registerSetting("OverrideConsole", false);
 	settings().registerOverride(globalSettings->getSetting("ShowConsole"));
 	settings().registerOverride(globalSettings->getSetting("AutoCloseConsole"));
+
+	settings().registerSetting("Sync", QString());
+
+	if (!settings().get("Sync").toString().isNull())
+	{
+		setSync(settings().get("Sync").toString());
+	}
 }
 
 void BaseInstance::iconUpdated(QString key)
@@ -211,6 +220,22 @@ void BaseInstance::setGroupPost(QString val)
 {
 	setGroupInitial(val);
 	emit groupChanged();
+}
+
+void BaseInstance::setSync(const QString &key)
+{
+	I_D(BaseInstance);
+	if (d->m_sync)
+	{
+		delete d->m_sync;
+	}
+	d->m_sync = SyncFactory::create(key, this, this);
+}
+
+SyncInterface *BaseInstance::sync() const
+{
+	I_D(const BaseInstance);
+	return d->m_sync;
 }
 
 QString BaseInstance::group() const

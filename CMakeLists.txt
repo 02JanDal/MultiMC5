@@ -116,6 +116,11 @@ SET(MultiMC_UPDATER false CACHE BOOL "Whether or not the update system is enable
 # Notification URL
 SET(MultiMC_NOTIFICATION_URL "" CACHE STRING "URL for checking for notifications.")
 
+# Sync
+OPTION(MultiMC_ENABLE_DROPBOX "Enable dropbox syncing?" OFF)
+SET(MultiMC_DROPBOX_CLIENT_SECRET "" CACHE STRING "The client secret for usage with dropbox.")
+SET(MultiMC_DROPBOX_CLIENT_KEY "" CACHE STRING "The client key for usage with dropbox.")
+
 SET(MultiMC_RELEASE_VERSION_NAME "${MultiMC_VERSION_MAJOR}.${MultiMC_VERSION_MINOR}")
 IF (MultiMC_VERSION_HOTFIX GREATER 0)
 	SET(MultiMC_RELEASE_VERSION_NAME "${MultiMC_RELEASE_VERSION_NAME}.${MultiMC_VERSION_HOTFIX}")
@@ -393,6 +398,14 @@ logic/news/NewsChecker.cpp
 logic/news/NewsEntry.h
 logic/news/NewsEntry.cpp
 
+# Sync/Backup
+logic/sync/SyncFactory.h
+logic/sync/SyncFactory.cpp
+logic/sync/SyncInterface.h
+logic/sync/SyncInterface.cpp
+logic/sync/SyncGit.h
+logic/sync/SyncGit.cpp
+
 # legacy instances
 logic/LegacyInstance.h
 logic/LegacyInstance.cpp
@@ -516,6 +529,9 @@ gui/widgets/MCModInfoFrame.ui
 
 set (FILES_TO_TRANSLATE ${FILES_TO_TRANSLATE} ${MULTIMC_SOURCES} ${MULTIMC_UIS})
 
+IF(MultiMC_ENABLE_DROPBOX)
+	LIST(APPEND MULTIMC_SOURCES logic/sync/SyncDropbox.h logic/sync/SyncDropbox.cpp logic/sync/SyncDropboxTasks.h logic/sync/SyncDropboxTasks.cpp)
+ENDIF(MultiMC_ENABLE_DROPBOX)
 
 ######## Windows resource files ########
 IF(WIN32)

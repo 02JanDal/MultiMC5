@@ -1243,7 +1243,7 @@ void MainWindow::on_actionInstanceSettings_triggered()
 	if (view->selectionModel()->selectedIndexes().count() < 1)
 		return;
 
-	InstanceSettings settings(&m_selectedInstance->settings(), this);
+	InstanceSettings settings(&m_selectedInstance->settings(), m_selectedInstance, this);
 	settings.setWindowTitle(tr("Instance settings"));
 	settings.exec();
 }

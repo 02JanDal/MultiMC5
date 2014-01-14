@@ -916,7 +916,7 @@
   </connection>
  </connections>
  <buttongroups>
-  <buttongroup name="sortingModeGroup"/>
   <buttongroup name="proxyGroup"/>
+  <buttongroup name="sortingModeGroup"/>
  </buttongroups>
 </ui>

@@ -25,7 +25,7 @@
 #include "logic/JavaUtils.h"
 #include "logic/NagUtils.h"
 #include "logic/lists/JavaVersionList.h"
-#include <logic/JavaChecker.h>
+#include "logic/JavaChecker.h"
 
 #include "logic/updater/UpdateChecker.h"
 

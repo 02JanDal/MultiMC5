@@ -30,6 +30,7 @@ class MinecraftProcess;
 class OneSixUpdate;
 class InstanceList;
 class BaseInstancePrivate;
+class SyncInterface;
 
 /*!
  * \brief Base class for instances.
@@ -85,6 +86,9 @@ public:
 	virtual bool setIntendedVersionId(QString version) = 0;
 
 	virtual bool versionIsCustom() = 0;
+
+	void setSync(const QString &key);
+	SyncInterface *sync() const;
 
 	/*!
 	 * The instance's current version.

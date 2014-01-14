@@ -38,3 +38,7 @@
 // It defaults in CMakeLists.txt to "http://multimc.org/rss.xml"
 #define NEWS_RSS_URL       "@MultiMC_NEWS_RSS_URL@"
 
+// Sync stuff
+#cmakedefine MultiMC_ENABLE_DROPBOX
+#define DROPBOX_CLIENT_SECRET "@MultiMC_DROPBOX_CLIENT_SECRET@"
+#define DROPBOX_CLIENT_KEY "@MultiMC_DROPBOX_CLIENT_KEY@"

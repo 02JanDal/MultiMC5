@@ -28,11 +28,13 @@
 #include "logic/lists/JavaVersionList.h"
 #include "logic/JavaChecker.h"
 
+#include "logic/sync/SyncFactory.h"
+
 #include <QFileDialog>
 #include <QMessageBox>
 
-InstanceSettings::InstanceSettings(SettingsObject *obj, QWidget *parent)
-	: QDialog(parent), ui(new Ui::InstanceSettings), m_obj(obj)
+InstanceSettings::InstanceSettings(SettingsObject *obj, BaseInstance *instance, QWidget *parent)
+	: QDialog(parent), ui(new Ui::InstanceSettings), m_obj(obj), m_instance(instance), m_syncSettingsWidget(0)
 {
 	MultiMCPlatform::fixWM_CLASS(this);
 	ui->setupUi(this);
@@ -77,6 +79,32 @@ void InstanceSettings::on_buttonBox_rejected()
 	MMC->settings()->set("SettingsGeometry", saveGeometry().toBase64());
 
 	reject();
+}
+
+void InstanceSettings::on_syncBox_currentTextChanged(const QString &text)
+{
+	bool isEnabled = m_obj->get("Sync").toString() == text;
+	ui->syncToggleBtn->setText(isEnabled ? tr("Disable") : tr("Enable"));
+	if (m_syncSettingsWidget)
+	{
+		ui->syncSettingsBox->layout()->removeWidget(m_syncSettingsWidget);
+		m_syncSettingsWidget->deleteLater();
+		m_syncSettingsWidget = 0;
+	}
+	if (isEnabled && m_instance->sync())
+	{
+		m_syncSettingsWidget = m_instance->sync()->getConfigWidget();
+		if (m_syncSettingsWidget)
+		{
+			ui->syncSettingsBox->layout()->addWidget(m_syncSettingsWidget);
+		}
+	}
+}
+void InstanceSettings::on_syncToggleBtn_clicked()
+{
+	m_obj->set("Sync", ui->syncBox->currentText());
+	m_instance->setSync(ui->syncBox->currentText());
+	on_syncBox_currentTextChanged(ui->syncBox->currentText());
 }
 
 void InstanceSettings::applySettings()
@@ -156,6 +184,22 @@ void InstanceSettings::applySettings()
 		m_obj->reset("PreLaunchCommand");
 		m_obj->reset("PostExitCommand");
 	}
+
+	// Sync
+	{
+		if (m_instance->sync())
+		{
+			m_obj->set("Sync", m_instance->sync()->key());
+			if (m_syncSettingsWidget)
+			{
+				m_instance->sync()->applySettings(m_syncSettingsWidget);
+			}
+		}
+		else
+		{
+			m_obj->set("Sync", "");
+		}
+	}
 }
 
 void InstanceSettings::loadSettings()
@@ -186,6 +230,13 @@ void InstanceSettings::loadSettings()
 	ui->customCommandsGroupBox->setChecked(m_obj->get("OverrideCommands").toBool());
 	ui->preLaunchCmdTextBox->setText(m_obj->get("PreLaunchCommand").toString());
 	ui->postExitCmdTextBox->setText(m_obj->get("PostExitCommand").toString());
+
+	// Sync
+	{
+		ui->syncBox->clear();
+		ui->syncBox->addItems(SyncFactory::keys());
+		on_syncBox_currentTextChanged(ui->syncBox->currentText());
+	}
 }
 
 void InstanceSettings::on_javaDetectBtn_clicked()

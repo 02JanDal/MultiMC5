@@ -19,6 +19,8 @@
 #include "settingsobject.h"
 #include "logic/JavaChecker.h"
 
+class BaseInstance;
+
 namespace Ui
 {
 class InstanceSettings;
@@ -29,7 +31,7 @@ class InstanceSettings : public QDialog
 	Q_OBJECT
 
 public:
-	explicit InstanceSettings(SettingsObject *s, QWidget *parent = 0);
+	explicit InstanceSettings(SettingsObject *s, BaseInstance *instance, QWidget *parent = 0);
 	~InstanceSettings();
 
 	void updateCheckboxStuff();
@@ -46,6 +48,9 @@ slots:
 	void on_buttonBox_accepted();
 	void on_buttonBox_rejected();
 
+	void on_syncBox_currentTextChanged(const QString &text);
+	void on_syncToggleBtn_clicked();
+
 	void on_javaDetectBtn_clicked();
 
 	void on_javaTestBtn_clicked();
@@ -57,4 +62,7 @@ private:
 	Ui::InstanceSettings *ui;
 	SettingsObject *m_obj;
 	std::shared_ptr<JavaChecker> checker;
+	BaseInstance *m_instance;
+
+	QWidget *m_syncSettingsWidget;
 };

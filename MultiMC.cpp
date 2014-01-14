@@ -44,6 +44,8 @@ MultiMC::MultiMC(int &argc, char **argv, bool root_override)
 	setOrganizationName("MultiMC");
 	setApplicationName("MultiMC5");
 
+	qsrand(QDateTime::currentMSecsSinceEpoch());
+
 	initTranslations();
 
 	setAttribute(Qt::AA_UseHighDpiPixmaps);
@@ -181,14 +183,6 @@ MultiMC::MultiMC(int &argc, char **argv, bool root_override)
 	// initialize the news checker
 	m_newsChecker.reset(new NewsChecker(NEWS_RSS_URL));
 
-	// and instances
-	auto InstDirSetting = m_settings->getSetting("InstanceDir");
-	m_instances.reset(new InstanceList(InstDirSetting->get().toString(), this));
-	QLOG_INFO() << "Loading Instances...";
-	m_instances->loadList();
-	connect(InstDirSetting.get(), SIGNAL(settingChanged(const Setting &, QVariant)),
-			m_instances.get(), SLOT(on_InstFolderChanged(const Setting &, QVariant)));
-
 	// and accounts
 	m_accounts.reset(new MojangAccountList(this));
 	QLOG_INFO() << "Loading accounts...";
@@ -203,6 +197,14 @@ MultiMC::MultiMC(int &argc, char **argv, bool root_override)
 
 	// init proxy settings
 	updateProxySettings();
+
+	// and instances
+	auto InstDirSetting = m_settings->getSetting("InstanceDir");
+	m_instances.reset(new InstanceList(InstDirSetting->get().toString(), this));
+	QLOG_INFO() << "Loading Instances...";
+	m_instances->loadList();
+	connect(InstDirSetting.get(), SIGNAL(settingChanged(const Setting &, QVariant)),
+			m_instances.get(), SLOT(on_InstFolderChanged(const Setting &, QVariant)));
 
 	// launch instance, if that's what should be done
 	// WARNING: disabled until further notice
