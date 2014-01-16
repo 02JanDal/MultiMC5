@@ -9,6 +9,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QDebug>
+#include <QFile>
 
 #include "MultiMC.h"
 #include "SyncDropbox.h"
@@ -16,21 +17,33 @@
 namespace SyncDropboxTasks
 {
 
-BaseTask::BaseTask(const QUrl &endpoint, bool authenticationNeeded, bool post,
+BaseTask::BaseTask(const QUrl &endpoint, bool authenticationNeeded, int operation,
 				   const QByteArray &data, SyncDropbox *parent)
-	: Task(parent), m_parent(parent), m_endpoint(endpoint), m_auth(authenticationNeeded), m_post(post)
+	: Task(parent), m_parent(parent), m_endpoint(endpoint), m_auth(authenticationNeeded),
+	  m_op(operation)
 {
 }
-void BaseTask::downloadFinished()
+BaseTask::BaseTask(const QUrl &endpoint, bool authenticationNeeded, int operation,
+				   SyncDropbox *parent)
+	: BaseTask(endpoint, authenticationNeeded, operation, QByteArray(), parent)
+{
+}
+
+void BaseTask::process(const QByteArray &data)
 {
 	QJsonParseError error;
-	QJsonDocument doc = QJsonDocument::fromJson(m_reply->readAll(), &error);
+	QJsonDocument doc = QJsonDocument::fromJson(data, &error);
 	if (error.error != QJsonParseError::NoError)
 	{
 		emitFailed(tr("JSON reply parse error: %1").arg(error.errorString()));
 		return;
 	}
 	process(doc);
+}
+
+void BaseTask::downloadFinished()
+{
+	process(m_reply->readAll());
 }
 void BaseTask::executeTask()
 {
@@ -41,13 +54,63 @@ void BaseTask::executeTask()
 		req.setRawHeader("Authorization", "Bearer " + m_parent->accessToken().toLocal8Bit());
 	}
 
-	m_reply = m_post ? MMC->qnam()->post(req, m_data) : MMC->qnam()->get(req);
+	switch (m_op)
+	{
+	case QNetworkAccessManager::HeadOperation:
+		m_reply = MMC->qnam()->head(req);
+		break;
+	case QNetworkAccessManager::GetOperation:
+		m_reply = MMC->qnam()->get(req);
+		break;
+	case QNetworkAccessManager::PutOperation:
+		m_reply = MMC->qnam()->put(req, m_data);
+		break;
+	case QNetworkAccessManager::PostOperation:
+		m_reply = MMC->qnam()->post(req, m_data);
+		break;
+	case QNetworkAccessManager::DeleteOperation:
+		m_reply = MMC->qnam()->deleteResource(req);
+		break;
+	default:
+		Q_ASSERT_X(false, Q_FUNC_INFO, "unknown/unsupported network operation");
+		return;
+	}
+
+	if (m_op == QNetworkAccessManager::PostOperation)
+	{
+		req.setHeader(QNetworkRequest::ContentLengthHeader, m_data.size());
+	}
+
 	connect(m_reply, &QNetworkReply::finished, this, &BaseTask::downloadFinished);
 	connect(m_reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(fail()));
 	connect(m_reply, &QNetworkReply::downloadProgress, this, [this](qint64 current, qint64 max)
+	{ setProgress(current * 100 / max); });
+}
+
+QUrl BaseTask::resolvedWithType(const EntityBase *entity, const QString &instance,
+								const QUrl &base)
+{
+	if (entity->type == EntityBase::Save)
 	{
-		setProgress(current * 100 / max);
-	});
+		return resolvedWithType(entity->type, instance, base).resolved(entity->path + "/");
+	}
+	return resolvedWithType(entity->type, instance, base);
+}
+QUrl BaseTask::resolvedWithType(const EntityBase::Type type, const QString &instance, const QUrl &base)
+{
+	if (type == EntityBase::Save)
+	{
+		return base.resolved(QUrl("saves/" + instance + "/"));
+	}
+	else if (type == EntityBase::Configs)
+	{
+		return base.resolved(QUrl("configs/" + instance + "/"));
+	}
+	else if (type == EntityBase::InstanceFolder)
+	{
+		return base.resolved(QUrl("instances/" + instance + "/"));
+	}
+	return base;
 }
 void BaseTask::fail()
 {
@@ -55,8 +118,8 @@ void BaseTask::fail()
 }
 
 DisconnectAccountTask::DisconnectAccountTask(SyncDropbox *parent)
-	: BaseTask(QUrl("https://api.dropbox.com/1/disable_access_token"), true, true, QByteArray(),
-			   parent)
+	: BaseTask(QUrl("https://api.dropbox.com/1/disable_access_token"), true,
+			   QNetworkAccessManager::PostOperation, parent)
 {
 }
 void DisconnectAccountTask::process(const QJsonDocument &doc)
@@ -95,13 +158,12 @@ void ConnectAccountTask::executeTask()
 	tokenQuery.addQueryItem("grant_type", "authorization_code");
 	tokenQuery.addQueryItem("client_id", m_parent->clientKey());
 	tokenQuery.addQueryItem("client_secret", m_parent->clientSecret());
-	m_reply = MMC->qnam()->post(QNetworkRequest(QUrl("https://api.dropbox.com/1/oauth2/token")), tokenQuery.toString(QUrl::FullyEncoded).toLocal8Bit());
+	m_reply = MMC->qnam()->post(QNetworkRequest(QUrl("https://api.dropbox.com/1/oauth2/token")),
+								tokenQuery.toString(QUrl::FullyEncoded).toLocal8Bit());
 	connect(m_reply, &QNetworkReply::finished, this, &ConnectAccountTask::downloadFinished);
 	connect(m_reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(fail()));
 	connect(m_reply, &QNetworkReply::downloadProgress, this, [this](qint64 current, qint64 max)
-	{
-		setProgress(current * 100 / max);
-	});
+	{ setProgress(current * 100 / max); });
 }
 void ConnectAccountTask::downloadFinished()
 {
@@ -120,13 +182,125 @@ void ConnectAccountTask::fail()
 }
 
 UserInfoTask::UserInfoTask(SyncDropbox *parent)
-	: BaseTask(QUrl("https://api.dropbox.com/1/account/info"), true, false, QByteArray(), parent)
+	: BaseTask(QUrl("https://api.dropbox.com/1/account/info"), true,
+			   QNetworkAccessManager::GetOperation, parent)
 {
 }
 void UserInfoTask::process(const QJsonDocument &doc)
 {
 	QJsonObject obj = doc.object();
 	m_parent->setUsername(obj.value("display_name").toString());
+	emitSucceeded();
+}
+
+RestoreTask::RestoreTask(const EntityBase *entity, const SyncVersionPtr version,
+						 SyncDropbox *parent)
+	: BaseTask(resolvedWithType(entity, parent->instance()->id(),
+								QUrl("https://api.dropbox.com/1/restore/sandbox/")),
+			   true, QNetworkAccessManager::PostOperation, parent)
+{
+	m_data = "rev=" + version->identifier.toLocal8Bit();
+}
+
+PutFileTask::PutFileTask(const QString &in, const QString &remote, const EntityBase *entity,
+						 SyncDropbox *parent)
+	: BaseTask(resolvedWithType(entity, parent->instance()->id(),
+								QUrl("https://api-content.dropbox.com/1/files_put/sandbox/"))
+			   .resolved(QUrl(remote)),
+			   true, QNetworkAccessManager::PutOperation, parent),
+	  m_in(in)
+{
+}
+
+void PutFileTask::executeTask()
+{
+	QFile file(m_in);
+	if (!file.open(QFile::ReadOnly))
+	{
+		emitFailed(tr("Error accessing %1: %2").arg(file.fileName(), file.errorString()));
+		return;
+	}
+	m_data = file.readAll();
+	BaseTask::executeTask();
+}
+
+GetFileTask::GetFileTask(const QString &out, const QString &remote, const EntityBase *entity, SyncDropbox *parent)
+	: BaseTask(resolvedWithType(entity, parent->instance()->id(),
+								QUrl("https://api-content.dropbox.com/1/files/sandbox/"))
+			   .resolved(QUrl(remote)),
+			   true, QNetworkAccessManager::GetOperation, parent),
+	  m_out(out), m_triesLeft(3)
+{
+}
+void GetFileTask::process(const QByteArray &data)
+{
+	if (!m_reply->header(QNetworkRequest::ContentLengthHeader).isNull())
+	{
+		if (m_reply->header(QNetworkRequest::ContentLengthHeader).toInt() != data.size())
+		{
+			if (m_triesLeft == 0)
+			{
+				emitFailed(tr("Failed to get %1 3 times. Aborting").arg(m_out));
+				return;
+			}
+			else
+			{
+				QLOG_INFO() << "Failed to get" << m_out << "." << m_triesLeft << " tries left. Retrying...";
+				m_triesLeft--;
+				executeTask();
+				return;
+			}
+		}
+	}
+	QFile file(m_out);
+	if (!file.open(QFile::WriteOnly))
+	{
+		emitFailed(tr("Error accessing %1: %2").arg(file.fileName(), file.errorString()));
+		return;
+	}
+	file.write(data);
+	file.close();
+	emitSucceeded();
+}
+
+GetRootEntitiesTask::GetRootEntitiesTask(const EntityBase::Type type, SyncDropbox *parent)
+	: BaseTask(resolvedWithType(type, parent->instance()->id(),
+								QUrl("https://api.dropbox.com/1/metadata/sandbox/")),
+			   true, QNetworkAccessManager::GetOperation, parent),
+	  m_type(type)
+{
+}
+
+void GetRootEntitiesTask::process(const QJsonDocument &doc)
+{
+	QJsonArray array = doc.object().value("contents").toArray();
+	QList<EntityBase *> entities;
+	foreach (const QJsonValue &val, array)
+	{
+		QJsonObject obj = val.toObject();
+		if (!obj.value("is_dir").toBool())
+		{
+			continue;
+		}
+		switch (m_type)
+		{
+		case EntityBase::Save:
+		{
+			QString name = obj.value("path").toString();
+			name = name.mid(name.lastIndexOf('/') + 1);
+			m_parent->addRootEntity(new EntitySave(name, m_parent));
+			break;
+		}
+		case EntityBase::Configs:
+			m_parent->addRootEntity(new EntityConfigs(m_parent));
+			break;
+		case EntityBase::InstanceFolder:
+			m_parent->addRootEntity(new EntityInstanceFolder(m_parent));
+			break;
+		default:
+			continue;
+		}
+	}
 	emitSucceeded();
 }
 

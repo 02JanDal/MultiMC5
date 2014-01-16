@@ -12,6 +12,7 @@ public:
 	void applySettings(const QWidget *widget);
 	QString key() const { return "Git"; }
 
+
 	void addRootEntity(EntityBase *entity);
 	void removeRootEntity(EntityBase *entity);
 	QList<EntityBase *> getRootEntities();
@@ -19,6 +20,6 @@ public:
 	BaseVersionList *getVersionList(const EntityBase *entity);
 
 	Task *push(const EntityBase *entity);
-	Task *setVersion(const EntityBase *entity, const SyncVersion &version);
+	Task *setVersion(const EntityBase *entity, const SyncVersionPtr version);
 	Task *pull(const EntityBase *entity);
 };

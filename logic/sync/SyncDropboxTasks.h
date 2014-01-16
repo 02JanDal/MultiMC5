@@ -5,6 +5,8 @@
 #include <QUrl>
 #include <memory>
 
+#include "SyncInterface.h"
+
 class SyncDropbox;
 class QNetworkReply;
 
@@ -14,15 +16,20 @@ class BaseTask : public Task
 {
 	Q_OBJECT
 public:
-	BaseTask(const QUrl &endpoint, bool authenticationNeeded, bool post, const QByteArray &data, SyncDropbox *parent = 0);
+	BaseTask(const QUrl &endpoint, bool authenticationNeeded, int operation, const QByteArray &data, SyncDropbox *parent = 0);
+	BaseTask(const QUrl &endpoint, bool authenticationNeeded, int operation, SyncDropbox *parent = 0);
 
 protected:
+	virtual void process(const QByteArray &data);
 	virtual void process(const QJsonDocument &doc)
 	{
 		Q_UNUSED(doc);
 		emitSucceeded();
 	}
 	virtual void executeTask();
+
+	QUrl resolvedWithType(const EntityBase *entity, const QString &instance, const QUrl &base);
+	QUrl resolvedWithType(const EntityBase::Type type, const QString &instance, const QUrl &base);
 
 private
 slots:
@@ -33,7 +40,7 @@ protected:
 	SyncDropbox *m_parent;
 	QUrl m_endpoint;
 	bool m_auth;
-	bool m_post;
+	int m_op;
 	QByteArray m_data;
 	QNetworkReply *m_reply;
 };
@@ -73,5 +80,48 @@ public:
 
 protected:
 	void process(const QJsonDocument &doc);
+};
+class RestoreTask : public BaseTask
+{
+	Q_OBJECT
+public:
+	RestoreTask(const EntityBase *entity, const SyncVersionPtr version, SyncDropbox *parent = 0);
+};
+class PutFileTask : public BaseTask
+{
+	Q_OBJECT
+public:
+	PutFileTask(const QString &in, const QString &remote, const EntityBase *entity, SyncDropbox *parent);
+
+protected:
+	void executeTask();
+
+private:
+	QString m_in;
+};
+class GetFileTask : public BaseTask
+{
+	Q_OBJECT
+public:
+	GetFileTask(const QString &out, const QString &remote, const EntityBase *entity, SyncDropbox *parent);
+
+protected:
+	void process(const QByteArray &data);
+
+private:
+	QString m_out;
+	int m_triesLeft;
+};
+class GetRootEntitiesTask : public BaseTask
+{
+	Q_OBJECT
+public:
+	GetRootEntitiesTask(const EntityBase::Type type, SyncDropbox *parent);
+
+protected:
+	void process(const QJsonDocument &doc);
+
+private:
+	EntityBase::Type m_type;
 };
 }

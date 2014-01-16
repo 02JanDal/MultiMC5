@@ -14,6 +14,7 @@ public:
 	void applySettings(const QWidget *widget);
 	QString key() const { return "Dropbox"; }
 
+	void setRootEntities(const QList<EntityBase *> &entities);
 	void addRootEntity(EntityBase *entity);
 	void removeRootEntity(EntityBase *entity);
 	QList<EntityBase *> getRootEntities();
@@ -21,7 +22,7 @@ public:
 	BaseVersionList *getVersionList(const EntityBase *entity);
 
 	Task *push(const EntityBase *entity);
-	Task *setVersion(const EntityBase *entity, const SyncVersion &version);
+	Task *setVersion(const EntityBase *entity, const SyncVersionPtr version);
 	Task *pull(const EntityBase *entity);
 
 	void setUsername(const QString &name);
@@ -56,4 +57,5 @@ private:
 	QString m_username;
 	bool m_connected;
 	QString m_accessToken;
+	QList<EntityBase *> m_rootEntities;
 };

@@ -150,7 +150,7 @@
       <attribute name="title">
        <string>Sync</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout" columnstretch="1,0">
+      <layout class="QGridLayout" name="gridLayout" rowstretch="0,0,1" columnstretch="1,0">
        <item row="0" column="1">
         <widget class="QPushButton" name="syncToggleBtn">
          <property name="text">
@@ -164,9 +164,56 @@
        <item row="1" column="0" colspan="2">
         <widget class="QGroupBox" name="syncSettingsBox">
          <property name="title">
-          <string/>
+          <string>Setup</string>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_6"/>
+        </widget>
+       </item>
+       <item row="2" column="0" colspan="2">
+        <widget class="QGroupBox" name="groupBox">
+         <property name="title">
+          <string>Entries</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_7">
+          <item>
+           <widget class="QTableWidget" name="syncEntriesWidget">
+            <property name="columnCount">
+             <number>3</number>
+            </property>
+            <attribute name="horizontalHeaderVisible">
+             <bool>false</bool>
+            </attribute>
+            <column/>
+            <column/>
+            <column/>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout">
+            <item>
+             <widget class="QPushButton" name="addSyncEntryBtn">
+              <property name="text">
+               <string>Add</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pullSyncEntryBtn">
+              <property name="text">
+               <string>Pull</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="removeSyncEntryBtn">
+              <property name="text">
+               <string>Remove</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
         </widget>
        </item>
       </layout>

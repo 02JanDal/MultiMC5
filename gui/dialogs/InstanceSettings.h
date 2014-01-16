@@ -51,6 +51,11 @@ slots:
 	void on_syncBox_currentTextChanged(const QString &text);
 	void on_syncToggleBtn_clicked();
 
+	void syncEntriesChanged();
+	void on_addSyncEntryBtn_clicked();
+	void on_pullSyncEntryBtn_clicked();
+	void on_removeSyncEntryBtn_clicked();
+
 	void on_javaDetectBtn_clicked();
 
 	void on_javaTestBtn_clicked();

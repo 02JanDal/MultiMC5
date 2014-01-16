@@ -6,41 +6,69 @@
 #include <QLabel>
 #include <QGroupBox>
 #include <QMessageBox>
+#include <QUrlQuery>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QDir>
+#include <QDebug>
 
 #include "logic/tasks/Task.h"
+#include "logic/tasks/SequentialTask.h"
 #include "gui/dialogs/ProgressDialog.h"
 #include "config.h"
 #include "SyncDropboxTasks.h"
 
-class SyncDropboxVersionListLoadTask : public Task
+class SyncDropboxVersionList;
+
+template<typename T>
+void addTasksRecursive(SequentialTask *root, const QDir &dir, const QDir &rootDir, const EntityBase *entity, SyncDropbox *parent)
+{
+	foreach (const QFileInfo &info, QDir(dir).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot))
+	{
+		if (info.isDir())
+		{
+			addTasksRecursive<T>(root, QDir(info.absoluteFilePath()), rootDir, entity, parent);
+		}
+		else
+		{
+			root->addTask(std::shared_ptr<Task>(
+							  new T(info.absoluteFilePath(), rootDir.relativeFilePath(info.absoluteFilePath()), entity, parent)));
+		}
+	}
+}
+
+class SyncDropboxVersionListLoadTask : public SyncDropboxTasks::BaseTask
 {
 	Q_OBJECT
 public:
-	SyncDropboxVersionListLoadTask(BaseVersionList *list, QObject *parent)
-		: Task(parent), m_vlist(list)
+	SyncDropboxVersionListLoadTask(const EntityBase *entity, SyncDropboxVersionList *list, SyncDropbox *parent)
+		: SyncDropboxTasks::BaseTask(QUrl(), true, false, QByteArray(), parent), m_vlist(list), m_entity(entity)
 	{
+		QUrl url("https://api.dropbox.com/1/revisions/sandbox/");
+		url = resolvedWithType(entity, entity->interface->instance()->id(), url);
+		m_endpoint.swap(url);
 	}
 
 protected:
-	void executeTask()
-	{
-	}
+	void process(const QJsonDocument &doc);
 
 private:
-	BaseVersionList *m_vlist;
+	SyncDropboxVersionList *m_vlist;
+	const EntityBase *m_entity;
 };
 
 class SyncDropboxVersionList : public BaseVersionList
 {
 	Q_OBJECT
 public:
-	SyncDropboxVersionList(QObject *parent = 0) : BaseVersionList(parent)
+	SyncDropboxVersionList(const EntityBase *entity, QObject *parent = 0) : BaseVersionList(parent), m_entity(entity)
 	{
 	}
 
 	Task *getLoadTask()
 	{
-		return new SyncDropboxVersionListLoadTask(this, this);
+		return new SyncDropboxVersionListLoadTask(m_entity, this, m_entity->getInterface<SyncDropbox*>());
 	}
 	bool isLoaded()
 	{
@@ -64,7 +92,7 @@ public:
 		});
 	}
 
-protected
+public
 slots:
 	void updateListData(QList<BaseVersionPtr> versions)
 	{
@@ -76,9 +104,30 @@ slots:
 
 private:
 	QList<BaseVersionPtr> m_versions;
+	const EntityBase *m_entity;
 
 	bool m_loaded = false;
 };
+
+void SyncDropboxVersionListLoadTask::process(const QJsonDocument &doc)
+{
+	QJsonArray list = doc.array();
+	QList<BaseVersionPtr> out;
+	foreach (const QJsonValue &val, list)
+	{
+		QJsonObject obj = val.toObject();
+		if (obj.value("is_deleted").toBool())
+		{
+			continue;
+		}
+		SyncVersion *version = new SyncVersion;
+		version->timestamp = QDateTime::fromString(obj.value("modified").toString(), Qt::RFC2822Date);
+		version->identifier = obj.value("rev").toString();
+		out.append(SyncVersionPtr(version));
+	}
+	m_vlist->updateListData(out);
+	emitSucceeded();
+}
 
 class SyncConfigWidget : public QWidget
 {
@@ -136,6 +185,7 @@ public:
 		layout->addWidget(m_toggleButton);
 		layout->addLayout(userinfoLayout);
 		layout->addWidget(m_customClientBox);
+		layout->addStretch(1);
 		setLayout(layout);
 	}
 
@@ -155,6 +205,15 @@ SyncDropbox::SyncDropbox(BaseInstance *instance, QObject *parent)
 	instance->settings().registerSetting("DropboxAccessToken", "");
 
 	setAccessToken(instance->settings().get("DropboxAccessToken").toString());
+
+	connect(this, &SyncDropbox::connectedChanged, [this]()
+	{
+		SequentialTask *task = new SequentialTask(this);
+		task->addTask(std::shared_ptr<Task>(new SyncDropboxTasks::GetRootEntitiesTask(EntityBase::Save, this)));
+		task->addTask(std::shared_ptr<Task>(new SyncDropboxTasks::GetRootEntitiesTask(EntityBase::Configs, this)));
+		task->addTask(std::shared_ptr<Task>(new SyncDropboxTasks::GetRootEntitiesTask(EntityBase::InstanceFolder, this)));
+		task->start();
+	});
 }
 
 QWidget *SyncDropbox::getConfigWidget()
@@ -166,11 +225,20 @@ void SyncDropbox::applySettings(const QWidget *widget)
 {
 }
 
+void SyncDropbox::setRootEntities(const QList<EntityBase *> &entities)
+{
+	m_rootEntities = entities;
+	emit rootEntitiesChanged();
+}
 void SyncDropbox::addRootEntity(EntityBase *entity)
 {
+	m_rootEntities.append(entity);
+	emit rootEntitiesChanged();
 }
 void SyncDropbox::removeRootEntity(EntityBase *entity)
 {
+	m_rootEntities.removeAll(entity);
+	emit rootEntitiesChanged();
 }
 QList<EntityBase *> SyncDropbox::getRootEntities()
 {
@@ -179,20 +247,50 @@ QList<EntityBase *> SyncDropbox::getRootEntities()
 
 BaseVersionList *SyncDropbox::getVersionList(const EntityBase *entity)
 {
-	return new SyncDropboxVersionList();
+	return new SyncDropboxVersionList(entity);
 }
 
 Task *SyncDropbox::push(const EntityBase *entity)
 {
-	return 0;
+	SequentialTask *task = new SequentialTask(this);
+	QDir root;
+	if (entity->type == EntityBase::Save)
+	{
+		root = QDir(m_instance->minecraftRoot() + "/saves/" + entity->path);
+	}
+	else if (entity->type == EntityBase::Configs)
+	{
+		root = QDir(m_instance->minecraftRoot() + "/config");
+	}
+	else if (entity->type == EntityBase::InstanceFolder)
+	{
+		root = QDir(m_instance->instanceRoot());
+	}
+	addTasksRecursive<SyncDropboxTasks::PutFileTask>(task, root, root, entity, this);
+	return task;
 }
-Task *SyncDropbox::setVersion(const EntityBase *entity, const SyncVersion &version)
+Task *SyncDropbox::setVersion(const EntityBase *entity, const SyncVersionPtr version)
 {
-	return 0;
+	return new SyncDropboxTasks::RestoreTask(entity, version, this);
 }
 Task *SyncDropbox::pull(const EntityBase *entity)
 {
-	return 0;
+	SequentialTask *task = new SequentialTask(this);
+	QDir root;
+	if (entity->type == EntityBase::Save)
+	{
+		root = QDir(m_instance->minecraftRoot() + "/saves/" + entity->path);
+	}
+	else if (entity->type == EntityBase::Configs)
+	{
+		root = QDir(m_instance->minecraftRoot() + "/config");
+	}
+	else if (entity->type == EntityBase::InstanceFolder)
+	{
+		root = QDir(m_instance->instanceRoot());
+	}
+	addTasksRecursive<SyncDropboxTasks::GetFileTask>(task, root, root, entity, this);
+	return task;
 }
 
 void SyncDropbox::setUsername(const QString &name)

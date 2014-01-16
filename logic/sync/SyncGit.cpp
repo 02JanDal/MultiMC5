@@ -106,7 +106,7 @@ Task *SyncGit::push(const EntityBase *entity)
 {
 	return 0;
 }
-Task *SyncGit::setVersion(const EntityBase *entity, const SyncVersion &version)
+Task *SyncGit::setVersion(const EntityBase *entity, const SyncVersionPtr version)
 {
 	return 0;
 }

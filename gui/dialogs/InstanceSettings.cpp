@@ -22,6 +22,7 @@
 #include "ui_InstanceSettings.h"
 #include "gui/Platform.h"
 #include "gui/dialogs/VersionSelectDialog.h"
+#include "gui/dialogs/ProgressDialog.h"
 
 #include "logic/JavaUtils.h"
 #include "logic/NagUtils.h"
@@ -32,6 +33,7 @@
 
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QInputDialog>
 
 InstanceSettings::InstanceSettings(SettingsObject *obj, BaseInstance *instance, QWidget *parent)
 	: QDialog(parent), ui(new Ui::InstanceSettings), m_obj(obj), m_instance(instance), m_syncSettingsWidget(0)
@@ -40,6 +42,12 @@ InstanceSettings::InstanceSettings(SettingsObject *obj, BaseInstance *instance, 
 	ui->setupUi(this);
 
 	restoreGeometry(QByteArray::fromBase64(MMC->settings()->get("SettingsGeometry").toByteArray()));
+
+	if (instance->sync())
+	{
+		connect(instance->sync(), &SyncInterface::rootEntitiesChanged, this, &InstanceSettings::syncEntriesChanged);
+		syncEntriesChanged();
+	}
 
 	loadSettings();
 }
@@ -105,6 +113,111 @@ void InstanceSettings::on_syncToggleBtn_clicked()
 	m_obj->set("Sync", ui->syncBox->currentText());
 	m_instance->setSync(ui->syncBox->currentText());
 	on_syncBox_currentTextChanged(ui->syncBox->currentText());
+}
+
+void InstanceSettings::syncEntriesChanged()
+{
+	if (!m_instance->sync())
+	{
+		return;
+	}
+	QList<EntityBase *> entities = m_instance->sync()->getRootEntities();
+	ui->syncEntriesWidget->clear();
+	ui->syncEntriesWidget->setRowCount(entities.size());
+	int row = 0;
+	foreach (EntityBase *entity, entities)
+	{
+		QTableWidgetItem *type = new QTableWidgetItem(EntityBase::typeToString(entity->type));
+		type->setData(Qt::UserRole, QVariant::fromValue(entity));
+		QTableWidgetItem *path = new QTableWidgetItem(entity->path);
+		QPushButton *btn = new QPushButton(tr("Set version"), this);
+		connect(btn, &QPushButton::clicked, [this, entity]()
+		{
+			entity->changeVersion(this);
+		});
+		ui->syncEntriesWidget->setItem(row, 0, type);
+		ui->syncEntriesWidget->setItem(row, 1, path);
+		ui->syncEntriesWidget->setCellWidget(row, 2, btn);
+		++row;
+	}
+}
+void InstanceSettings::on_addSyncEntryBtn_clicked()
+{
+	if (!m_instance->sync() || !m_instance->sync())
+	{
+		return;
+	}
+	QStringList items;
+	items << tr("Save") << tr("Configs") << tr("Instance folder");
+	bool ok = false;
+	const QString item = QInputDialog::getItem(this, m_instance->sync()->key(), tr("What type of sync to you want to setup?"),
+											   items, 0, false, &ok);
+	if (!ok)
+	{
+		return;
+	}
+	if (items.indexOf(item) == 0)
+	{
+		QStringList saves;
+		foreach (const QFileInfo &info, QDir(m_instance->minecraftRoot() + "/saves").entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot))
+		{
+			if (!info.isDir())
+			{
+				continue;
+			}
+			saves.append(info.fileName());
+		}
+		if (saves.isEmpty())
+		{
+			return;
+		}
+		const QString save = QInputDialog::getItem(this, m_instance->sync()->key(), tr("Please select which save to backup"), saves, 0, false, &ok);
+		if (!ok)
+		{
+			return;
+		}
+		EntityBase *entity = new EntitySave(save, m_instance->sync());
+		m_instance->sync()->addRootEntity(entity);
+		ProgressDialog dialog(this);
+		dialog.exec(m_instance->sync()->push(entity));
+	}
+	else if (items.indexOf(item) == 1)
+	{
+		EntityBase *entity = new EntityConfigs(m_instance->sync());
+		m_instance->sync()->addRootEntity(entity);
+		ProgressDialog dialog(this);
+		dialog.exec(m_instance->sync()->push(entity));
+	}
+	else if (items.indexOf(item) == 2)
+	{
+		EntityBase *entity = new EntityInstanceFolder(m_instance->sync());
+		m_instance->sync()->addRootEntity(entity);
+		ProgressDialog dialog(this);
+		dialog.exec(m_instance->sync()->push(entity));
+	}
+}
+
+void InstanceSettings::on_pullSyncEntryBtn_clicked()
+{
+	if (!m_instance->sync() || ui->syncEntriesWidget->currentRow() == -1 || !m_instance->sync())
+	{
+		return;
+	}
+	EntityBase *entity = ui->syncEntriesWidget->item(ui->syncEntriesWidget->currentRow(), 0)->data(Qt::UserRole).value<EntityBase *>();
+	m_instance->sync()->pull(entity);
+}
+void InstanceSettings::on_removeSyncEntryBtn_clicked()
+{
+	if (!m_instance->sync() || ui->syncEntriesWidget->currentRow() == -1 || !m_instance->sync())
+	{
+		return;
+	}
+	EntityBase *entity = ui->syncEntriesWidget->item(ui->syncEntriesWidget->currentRow(), 0)->data(Qt::UserRole).value<EntityBase *>();
+	if (QMessageBox::question(this, m_instance->sync()->key(), tr("Really remove the %1 (%2)? This will not delete them, but it will not be possible to get back old versions from inside MultiMC")
+							  .arg(EntityBase::typeToString(entity->type), entity->path)) == QMessageBox::Yes)
+	{
+		m_instance->sync()->removeRootEntity(entity);
+	}
 }
 
 void InstanceSettings::applySettings()
