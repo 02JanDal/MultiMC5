@@ -36,7 +36,9 @@ set(CMAKE_JAVA_TARGET_OUTPUT_DIR ${PROJECT_BINARY_DIR}/jars)
 include(UseCXX11)
 include(Coverage)
 set(CMAKE_CXX_FLAGS " -Wall ${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Werror=return-type")
+if(NOT ${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Werror=return-type")
+endif()
 
 ################################ 3rd Party Libs ################################
 
